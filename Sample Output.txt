@@ -1,0 +1,37 @@
+Use the arrow keys to select a card to [I]nvest or [D]iscard; or [P]eek at a discard pile
+Player {player.Number} Score: {player.Score}
+Hand: 12345678
+
+156
+
+     #
+     9
+     8
+ #   7
+ 9   6
+ 8   5
+ 7   4
+ 3   3
+ 2   2
+ $   $
+ $   $
+ $   $
+ R   G   W   B   Y   D 
+ 4   $ 
+ 5   $ 
+ 6   $ 
+     2 
+     3 
+     4 
+     5 
+     6 
+     7 
+     8 
+     9 
+     # 
+
+ -5
+
+Hand: 12345678
+Player {player.Number} Score: {player.Score}
+Use the arrow keys to select a card to [I]nvest or [D]iscard; or [P]eek at a discard pile
