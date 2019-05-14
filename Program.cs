@@ -4,12 +4,16 @@ using System.Collections.Generic;
 
 namespace LostCities
 {
-    // TODO: draw "playing area"
+    // TODO: rework the prompts to support arrow keys
+    // TODO: allow peeking at a discard pile
+    // TODO: refactor to use Stack<Card> for the deck and the discard piles
+    // TODO: enable sorting the hands
 
     class Program
     {
         static void Main(string[] args)
         {
+            Console.WindowHeight = 38;
             var game = new Game();
 
             while (game.Deck.Count > 0)
@@ -22,17 +26,20 @@ namespace LostCities
             Console.WriteLine("=======================");
             Console.WriteLine($"Player 1 scored {game.Player1.Score}");
             Console.WriteLine($"Player 2 scored {game.Player2.Score}");
+
+            Console.ReadKey(true);
         }
 
         static void TakeTurn(Player player)
         {
-            WriteCards($"Player {player.Number}", player.Hand, card => player.CanInvest(card));
+            DrawPlayingArea(player.Game);
+
 Choose:
             var index = ReadInt("Pick a card to discard");
+
             if (player.CanInvest(player.Hand[index]))
             {
-                Console.WriteLine($"What do you want to do with the {player.Hand[index]}?");
-                var choice = ReadOptions("[I]nvest or [D]iscard?", 'i', 'd');
+                var choice = ReadOptions($"Do you want to [I]nvest or [D]iscard the {player.Hand[index]}?", 'i', 'd');
                 switch (choice)
                 {
                     case 'i':
@@ -45,8 +52,7 @@ Choose:
             }
             else
             {
-                Console.WriteLine($"The {player.Hand[index]} cannot be invested, do you want to discard it?");
-                var choice = ReadOptions("[D]iscard or [C]hoose again?", 'd', 'c');
+                var choice = ReadOptions($"The {player.Hand[index]} cannot be invested, do you want to [D]iscard or [C]hoose again?", 'd', 'c');
                 switch (choice)
                 {
                     case 'c':
@@ -57,10 +63,11 @@ Choose:
                 }
             }
 
+            DrawPlayingArea(player.Game);
+
             {
-                Console.WriteLine($"From where will you draw a card?");
                 var choices = GetChoices(player.Game.Discards);
-                var choice = ReadOptions(choices.prompt, choices.choices);
+                var choice = ReadOptions($"From where will you draw a card? {choices.prompt}", choices.choices);
                 switch (choice)
                 {
                     case 'd':
@@ -84,7 +91,7 @@ Choose:
                 }
             }
 
-            Console.WriteLine($"Player {player.Number} Score is {player.Score}");
+            DrawPlayingArea(player.Game);
 
             (string prompt, char[] choices) GetChoices(IEnumerable<KeyValuePair<Suit, IList<Card>>> discards)
             {
@@ -97,38 +104,24 @@ Choose:
 
         static char ReadOptions(string prompt, params char[] options)
         {
-            Console.WriteLine(prompt);
-            try
+            Console.Write(prompt);
+            do
             {
-                do
-                {
-                    var key = Console.ReadKey(true);
-                    if (options.Contains(key.KeyChar))
-                        return key.KeyChar;
-                }while(true);
-            }
-            finally
-            {
-                Console.WriteLine();
-            }
+                var key = Console.ReadKey(true);
+                if (options.Contains(key.KeyChar))
+                    return key.KeyChar;
+            } while(true);
         }
 
         static int ReadInt(string prompt)
         {
-            Console.WriteLine(prompt);
-            try
+            Console.Write(prompt);
+            do
             {
-                do
-                {
-                    var key = Console.ReadKey(true);
-                    if (char.IsDigit(key.KeyChar))
-                        return int.Parse(key.KeyChar.ToString());
-                }while(true);
-            }
-            finally
-            {
-                Console.WriteLine();
-            }
+                var key = Console.ReadKey(true);
+                if (char.IsDigit(key.KeyChar))
+                    return int.Parse(key.KeyChar.ToString());
+            }while(true);
         }
 
         static void WriteCards(string title, IEnumerable<Card> cards, Func<Card, bool> usableCallback = null)
@@ -146,7 +139,7 @@ Choose:
             }
         }
 
-        static ConsoleColor GetConsoleColor(Suit suit, bool usable)
+        static ConsoleColor GetConsoleColor(Suit suit, bool usable = true)
         {
             switch (suit)
             {
@@ -158,6 +151,74 @@ Choose:
                 default: throw new InvalidOperationException("Unknown suit");
             }
         }
+
+        static void DrawPlayingArea(Game game)
+        {
+            Console.Clear();
+            Console.SetCursorPosition(0,0);
+            Console.WriteLine($"Player {game.Player1.Number} Score: {game.Player1.Score}");
+            Console.Write($"Hand: ");
+            DrawHand(game.Player1);
+
+            Console.SetCursorPosition(0,34);
+            Console.Write($"Hand: ");
+            DrawHand(game.Player2);
+            Console.WriteLine($"Player {game.Player2.Number} Score: {game.Player2.Score}");
+
+            var boardPosition = 18;
+
+            var (left,top) = (1, boardPosition);
+            foreach (Suit suit in Enum.GetValues(typeof(Suit)))
+            {
+                Console.ResetColor();
+                Console.ForegroundColor = ConsoleColor.Black;
+                Console.BackgroundColor = GetConsoleColor(suit);
+                Console.SetCursorPosition(left, top);
+                Console.Write(suit.ToString()[0]);
+
+                Console.ResetColor();
+                Console.ForegroundColor = GetConsoleColor(suit);
+
+                foreach (var c in game.Player1.Adventures[suit].Investments)
+                {
+                    Console.SetCursorPosition(left, --top);
+                    Console.Write(GetCardDisplayText(c));
+                }
+                top = boardPosition;
+
+                foreach (var c in game.Player2.Adventures[suit].Investments)
+                {
+                    Console.SetCursorPosition(left, ++top);
+                    Console.Write(GetCardDisplayText(c));
+                }
+                top = boardPosition;
+                left += 4;
+            }
+
+            top = boardPosition;
+
+            Console.SetCursorPosition(left, boardPosition);
+            Console.ForegroundColor = ConsoleColor.Black;
+            Console.BackgroundColor = ConsoleColor.Gray;
+            Console.Write("D");
+            Console.ResetColor();
+            Console.Write($" = {game.Deck.Count}");
+
+            Console.SetCursorPosition(0, 36);
+        }
+
+        static void DrawHand(Player player)
+        {
+            foreach (var card in player.Hand)
+            {
+                Console.ForegroundColor = GetConsoleColor(card.Suit, player.CanInvest(card));
+                Console.Write(GetCardDisplayText(card));
+            }
+            Console.WriteLine();
+            Console.ResetColor();
+        }
+
+        static string GetCardDisplayText(Card card) => card.IsMultiplier ? "$" : card.Value == 10 ? "#" : card.Value.ToString();
     }
 
     public enum Suit
@@ -331,7 +392,7 @@ Choose:
 
     public static class Extensions
     {
-        private static Random rng = new Random();  
+        private static readonly Random rng = new Random();  
 
         public static IList<T> Shuffle<T>(this IList<T> list)  
         {  
