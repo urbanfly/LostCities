@@ -4,7 +4,6 @@ using System.Collections.Generic;
 
 namespace LostCities
 {
-    // TODO: Disallow drawing a card that was just discarded
     // TODO: draw "playing area"
 
     class Program
@@ -89,7 +88,7 @@ Choose:
 
             (string prompt, char[] choices) GetChoices(IEnumerable<KeyValuePair<Suit, IList<Card>>> discards)
             {
-                var piles = discards.Where(d=>d.Value.Any()).Select(d=>d.Key.ToString()).Prepend("Deck");
+                var piles = discards.Where(d=>player.CanDrawFrom(d.Value)).Select(d=>d.Key.ToString()).Prepend("Deck");
                 var options = piles.Select(p=>p.ToLowerInvariant()[0]).ToArray();
                 var prompt = string.Join(", ", piles.Select(p=>p.Insert(0, "[").Insert(2, "]")));
                 return (prompt, options);
@@ -103,7 +102,7 @@ Choose:
             {
                 do
                 {
-                    var key = Console.ReadKey();
+                    var key = Console.ReadKey(true);
                     if (options.Contains(key.KeyChar))
                         return key.KeyChar;
                 }while(true);
@@ -121,7 +120,7 @@ Choose:
             {
                 do
                 {
-                    var key = Console.ReadKey();
+                    var key = Console.ReadKey(true);
                     if (char.IsDigit(key.KeyChar))
                         return int.Parse(key.KeyChar.ToString());
                 }while(true);
@@ -249,6 +248,7 @@ Choose:
             var card = this.hand[index];
             this.hand.RemoveAt(index);
             this.Adventures[card.Suit].Invest(card);
+            this.LastDiscardedCard = null;
             return this;
         }
 
@@ -262,14 +262,22 @@ Choose:
             var card = this.hand[index];
             this.hand.RemoveAt(index);
             this.Game.Discard(card);
+            this.LastDiscardedCard = card;
             return this;
         }
+
+        public Card LastDiscardedCard {get;set;}
 
         public void DrawFrom(IList<Card> deck)
         {
             var card = deck.Last();
             deck.Remove(card);
             this.hand.Add(card);
+        }
+
+        public bool CanDrawFrom(IList<Card> stack)
+        {
+            return stack.Any() && (this.LastDiscardedCard == null || this.LastDiscardedCard != stack.LastOrDefault());
         }
     }
 
