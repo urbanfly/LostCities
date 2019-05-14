@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Collections.Generic;
 
@@ -294,9 +294,11 @@ namespace LostCities
         
         public int Cost => investments.Any(c=>!c.IsMultiplier) ? 20 : 20 * Multiplier;
 
-        public int Value => investments.Any() ? -Cost + investments.Sum(c => c.Value) * Multiplier : 0;
+        public int Value => investments.Any() ? (-Cost + investments.Sum(c => c.Value) * Multiplier) + Bonus : 0;
 
         public int Multiplier => investments.Count(c => c.IsMultiplier) + 1;
+
+        public int Bonus => investments.Count >= 8 ? 20 : 0;
 
         public void Invest(Card card)
         {
