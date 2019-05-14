@@ -280,9 +280,9 @@ namespace LostCities
         public Suit Suit { get; }
         public IReadOnlyList<Card> Investments => investments;
         
-        public int Cost => investments.Any(c=>!c.IsMultiplier) ? 20 : 20 * Multiplier;
+        public int Cost => investments.Any() ? 20 : 0;
 
-        public int Value => investments.Any() ? (-Cost + investments.Sum(c => c.Value) * Multiplier) + Bonus : 0;
+        public int Value => ((investments.Sum(c => c.Value) - Cost) * Multiplier) + Bonus;
 
         public int Multiplier => investments.Count(c => c.IsMultiplier) + 1;
 
