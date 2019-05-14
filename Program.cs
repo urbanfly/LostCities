@@ -4,10 +4,9 @@ using System.Collections.Generic;
 
 namespace LostCities
 {
-    // TODO: rework the prompts to support arrow keys
     // TODO: allow peeking at a discard pile
     // TODO: refactor to use Stack<Card> for the deck and the discard piles
-    // TODO: enable sorting the hands
+    // TODO: display points for each adventure
 
     class Program
     {
@@ -33,37 +32,12 @@ namespace LostCities
         static void TakeTurn(Player player)
         {
             DrawPlayingArea(player.Game);
+            Console.SetCursorPosition(0, player.Number == 1 ? 0 : 36);
 
-Choose:
-            var index = ReadInt("Pick a card to discard");
-
-            if (player.CanInvest(player.Hand[index]))
-            {
-                var choice = ReadOptions($"Do you want to [I]nvest or [D]iscard the {player.Hand[index]}?", 'i', 'd');
-                switch (choice)
-                {
-                    case 'i':
-                        player.Invest(index);
-                        break;
-                    case 'd':
-                        player.Discard(index);
-                        break;
-                }
-            }
-            else
-            {
-                var choice = ReadOptions($"The {player.Hand[index]} cannot be invested, do you want to [D]iscard or [C]hoose again?", 'd', 'c');
-                switch (choice)
-                {
-                    case 'c':
-                        goto Choose;
-                    case 'd':
-                        player.Discard(index);
-                        break;
-                }
-            }
+            PickCard(player);
 
             DrawPlayingArea(player.Game);
+            Console.SetCursorPosition(0, player.Number == 1 ? 0 : 36);
 
             {
                 var choices = GetChoices(player.Game.Discards);
@@ -92,6 +66,7 @@ Choose:
             }
 
             DrawPlayingArea(player.Game);
+            Console.SetCursorPosition(0, player.Number == 1 ? 0 : 36);
 
             (string prompt, char[] choices) GetChoices(IEnumerable<KeyValuePair<Suit, IList<Card>>> discards)
             {
@@ -113,15 +88,50 @@ Choose:
             } while(true);
         }
 
-        static int ReadInt(string prompt)
+        static void PickCard(Player player)
         {
-            Console.Write(prompt);
+            var candidateIndex = 0;
             do
             {
+                player.Candidate = player.Hand[candidateIndex];
+
+                Console.SetCursorPosition(0, player.Number == 1 ? 0 : 36);
+
+                if (player.CanInvest(player.Candidate))
+                {
+                    Console.Write("Use the arrow keys to select a card. [I]nvest or [D]iscard"); // or [P]eek at a discard pile");
+                }
+                else
+                {
+                    Console.Write("Use the arrow keys to select a card. [D]iscard            "); // or [P]eek at a discard pile            ");
+                }
+
+                Console.SetCursorPosition(6, player.Number == 1 ? 2 : 34);
+                DrawHand(player);
+
                 var key = Console.ReadKey(true);
-                if (char.IsDigit(key.KeyChar))
-                    return int.Parse(key.KeyChar.ToString());
-            }while(true);
+                switch (key.Key)
+                {
+                    case ConsoleKey.LeftArrow:
+                        candidateIndex = Math.Max(candidateIndex-1, 0);
+                        break;
+                    case ConsoleKey.RightArrow:
+                        candidateIndex = Math.Min(candidateIndex+1, player.Hand.Count - 1);
+                        break;
+                    case ConsoleKey.I:
+                        if (player.CanInvest(player.Candidate))
+                        {
+                            player.Invest(player.Candidate);
+                            return;
+                        }
+                        break;
+                    case ConsoleKey.D:
+                        player.Discard(player.Candidate);
+                        return;
+                    // case ConsoleKey.P:
+                    //     return player.Candidate;
+                }
+            } while(true);
         }
 
         static void WriteCards(string title, IEnumerable<Card> cards, Func<Card, bool> usableCallback = null)
@@ -155,7 +165,7 @@ Choose:
         static void DrawPlayingArea(Game game)
         {
             Console.Clear();
-            Console.SetCursorPosition(0,0);
+            Console.SetCursorPosition(0,1);
             Console.WriteLine($"Player {game.Player1.Number} Score: {game.Player1.Score}");
             Console.Write($"Hand: ");
             DrawHand(game.Player1);
@@ -203,19 +213,25 @@ Choose:
             Console.Write("D");
             Console.ResetColor();
             Console.Write($" = {game.Deck.Count}");
-
-            Console.SetCursorPosition(0, 36);
         }
 
         static void DrawHand(Player player)
         {
             foreach (var card in player.Hand)
             {
-                Console.ForegroundColor = GetConsoleColor(card.Suit, player.CanInvest(card));
+                if (card == player.Candidate)
+                {
+                    Console.BackgroundColor = GetConsoleColor(card.Suit, player.CanInvest(card));
+                    Console.ForegroundColor = ConsoleColor.Black;
+                }
+                else
+                {
+                    Console.ForegroundColor = GetConsoleColor(card.Suit, player.CanInvest(card));
+                }
                 Console.Write(GetCardDisplayText(card));
+                Console.ResetColor();
             }
             Console.WriteLine();
-            Console.ResetColor();
         }
 
         static string GetCardDisplayText(Card card) => card.IsMultiplier ? "$" : card.Value == 10 ? "#" : card.Value.ToString();
@@ -230,7 +246,7 @@ Choose:
         Yellow
     }
 
-    public class Card
+    public class Card : IComparable<Card>
     {
         public Card(int value, Suit suit)
         {
@@ -249,6 +265,17 @@ Choose:
                 return $"{Suit} Investment";
             else
                 return $"{Suit} {Value}";
+        }
+
+        public int CompareTo(Card other)
+        {
+            if(other == null)
+                return 1;
+
+            if (Suit != other.Suit)
+                return Suit - other.Suit;
+            
+            return Value - other.Value;
         }
     }
 
@@ -287,6 +314,7 @@ Choose:
         public Player(Game game, int number, List<Card> hand)
         {
             this.hand = hand;
+            this.hand.Sort();
             this.Number = number;
             this.Adventures = Enum.GetValues(typeof(Suit)).OfType<Suit>().ToDictionary(s=>s, s=>new Adventure(s));
             this.Game = game;
@@ -304,12 +332,12 @@ Choose:
 
         public Game Game {get;}
 
-        public Player Invest(int index)
+        public Player Invest(Card card)
         {
-            var card = this.hand[index];
-            this.hand.RemoveAt(index);
+            this.hand.Remove(card);
             this.Adventures[card.Suit].Invest(card);
             this.LastDiscardedCard = null;
+            this.Candidate = null;
             return this;
         }
 
@@ -318,22 +346,26 @@ Choose:
             return this.Adventures[card.Suit].CanInvest(card);
         }
 
-        public Player Discard(int index)
+        public Player Discard(Card card)
         {
-            var card = this.hand[index];
-            this.hand.RemoveAt(index);
+            this.hand.Remove(card);
             this.Game.Discard(card);
             this.LastDiscardedCard = card;
+            this.Candidate = null;
             return this;
         }
 
         public Card LastDiscardedCard {get;set;}
+
+        public Card Candidate {get;set;}
 
         public void DrawFrom(IList<Card> deck)
         {
             var card = deck.Last();
             deck.Remove(card);
             this.hand.Add(card);
+            this.hand.Sort();
+            this.Game.NextPlayer();
         }
 
         public bool CanDrawFrom(IList<Card> stack)
@@ -356,8 +388,11 @@ Choose:
             this.Deck = GenerateDeck().Shuffle();
             this.Discards = Enum.GetValues(typeof(Suit)).OfType<Suit>().ToDictionary(s=>s, s => (IList<Card>)new List<Card>());
             var hands = Deal(8, 2);
-            this.Player1 = new Player(this, 1, hands[0].ToList());
-            this.Player2 = new Player(this, 2, hands[1].ToList());
+            this.Players = new[]
+            {
+                new Player(this, 1, hands[0].ToList()), 
+                new Player(this, 2, hands[1].ToList())
+            };
 
             Card[][] Deal(int numberOfCards, int numberOfPlayers)
             {
@@ -381,12 +416,22 @@ Choose:
 
         public IList<Card> Deck {get;}
         public IReadOnlyDictionary<Suit, IList<Card>> Discards {get;}
-        public Player Player1 {get;}
-        public Player Player2 {get;}
+        public Player Player1 => this.Players[0];
+        public Player Player2 => this.Players[1];
+
+        public int CurrentPlayerIndex {get; set;} = 0;
+        public Player CurrentPlayer => this.Players[CurrentPlayerIndex - 1];
+
+        public Player[] Players {get;}
 
         public void Discard(Card card)
         {
             this.Discards[card.Suit].Add(card);
+        }
+
+        public void NextPlayer()
+        {
+            CurrentPlayerIndex = (CurrentPlayerIndex + 1) % Players.Length;
         }
     }
 
