@@ -6,7 +6,6 @@ namespace LostCities
 {
     // TODO: allow peeking at a discard pile
     // TODO: refactor to use Stack<Card> for the deck and the discard piles
-    // TODO: display points for each adventure
 
     class Program
     {
@@ -172,12 +171,18 @@ namespace LostCities
                 Console.ResetColor();
                 Console.ForegroundColor = GetConsoleColor(suit);
 
+                Console.SetCursorPosition(left-1, 4);
+                Console.Write(game.Player1.Adventures[suit].Value);
+
                 foreach (var c in game.Player1.Adventures[suit].Investments)
                 {
                     Console.SetCursorPosition(left, --top);
                     Console.Write(GetCardDisplayText(c));
                 }
                 top = boardPosition;
+
+                Console.SetCursorPosition(left-1, 32);
+                Console.Write(game.Player2.Adventures[suit].Value);
 
                 foreach (var c in game.Player2.Adventures[suit].Investments)
                 {
