@@ -5,9 +5,7 @@ using System.Collections.Generic;
 namespace LostCities
 {
     // TODO: Disallow drawing a card that was just discarded
-    // TODO: enforce increasing value when investing
     // TODO: draw "playing area"
-    // TODO: show unplayable cards in dimmed color
 
     class Program
     {
@@ -18,7 +16,7 @@ namespace LostCities
             while (game.Deck.Count > 0)
             {
                 TakeTurn(game.Player1);
-                if (game.Deck.Count > 0)
+                if (game.Deck.Count > 0) // make sure the last player didn't draw the last card
                     TakeTurn(game.Player2);
             }
 
@@ -29,43 +27,62 @@ namespace LostCities
 
         static void TakeTurn(Player player)
         {
-            WriteCards($"Player {player.Number}", player.Hand);
+            WriteCards($"Player {player.Number}", player.Hand, card => player.CanInvest(card));
+Choose:
             var index = ReadInt("Pick a card to discard");
-            Console.WriteLine($"What do you want to do with the {player.Hand[index]}?");
-            var choice = ReadOptions("[I]nvest or [D]iscard?", 'i', 'd');
-            switch (choice)
+            if (player.CanInvest(player.Hand[index]))
             {
-                case 'i':
-                    player.Invest(index);
-                    break;
-                case 'd':
-                    player.Discard(index);
-                    break;
+                Console.WriteLine($"What do you want to do with the {player.Hand[index]}?");
+                var choice = ReadOptions("[I]nvest or [D]iscard?", 'i', 'd');
+                switch (choice)
+                {
+                    case 'i':
+                        player.Invest(index);
+                        break;
+                    case 'd':
+                        player.Discard(index);
+                        break;
+                }
+            }
+            else
+            {
+                Console.WriteLine($"The {player.Hand[index]} cannot be invested, do you want to discard it?");
+                var choice = ReadOptions("[D]iscard or [C]hoose again?", 'd', 'c');
+                switch (choice)
+                {
+                    case 'c':
+                        goto Choose;
+                    case 'd':
+                        player.Discard(index);
+                        break;
+                }
             }
 
-            Console.WriteLine($"From where will you draw a card?");
-            var choices = GetChoices(player.Game.Discards);
-            choice = ReadOptions(choices.prompt, choices.choices);
-            switch (choice)
             {
-                case 'd':
-                    player.DrawFrom(player.Game.Deck);
-                    break;
-                case 'r':
-                    player.DrawFrom(player.Game.Discards[Suit.Red]);
-                    break;
-                case 'g':
-                    player.DrawFrom(player.Game.Discards[Suit.Green]);
-                    break;
-                case 'w':
-                    player.DrawFrom(player.Game.Discards[Suit.White]);
-                    break;
-                case 'b':
-                    player.DrawFrom(player.Game.Discards[Suit.Blue]);
-                    break;
-                case 'y':
-                    player.DrawFrom(player.Game.Discards[Suit.Yellow]);
-                    break;
+                Console.WriteLine($"From where will you draw a card?");
+                var choices = GetChoices(player.Game.Discards);
+                var choice = ReadOptions(choices.prompt, choices.choices);
+                switch (choice)
+                {
+                    case 'd':
+                        player.DrawFrom(player.Game.Deck);
+                        break;
+                    case 'r':
+                        player.DrawFrom(player.Game.Discards[Suit.Red]);
+                        break;
+                    case 'g':
+                        player.DrawFrom(player.Game.Discards[Suit.Green]);
+                        break;
+                    case 'w':
+                        player.DrawFrom(player.Game.Discards[Suit.White]);
+                        break;
+                    case 'b':
+                        player.DrawFrom(player.Game.Discards[Suit.Blue]);
+                        break;
+                    case 'y':
+                        player.DrawFrom(player.Game.Discards[Suit.Yellow]);
+                        break;
+                }
             }
 
             Console.WriteLine($"Player {player.Number} Score is {player.Score}");
@@ -115,7 +132,7 @@ namespace LostCities
             }
         }
 
-        static void WriteCards(string title, IEnumerable<Card> cards)
+        static void WriteCards(string title, IEnumerable<Card> cards, Func<Card, bool> usableCallback = null)
         {
             Console.WriteLine("====================");
             Console.WriteLine(title);
@@ -124,21 +141,21 @@ namespace LostCities
             foreach (var c in cards)
             {
                 Console.Write($"{i++}. ");
-                Console.ForegroundColor = GetConsoleColor(c.Suit);
+                Console.ForegroundColor = GetConsoleColor(c.Suit, usableCallback?.Invoke(c) ?? true);
                 Console.WriteLine(c);
                 Console.ResetColor();
             }
         }
 
-        static ConsoleColor GetConsoleColor(Suit suit)
+        static ConsoleColor GetConsoleColor(Suit suit, bool usable)
         {
             switch (suit)
             {
-                case Suit.Blue: return ConsoleColor.Blue;
-                case Suit.Green: return ConsoleColor.Green;
-                case Suit.Red: return ConsoleColor.Red;
-                case Suit.White: return ConsoleColor.White;
-                case Suit.Yellow: return ConsoleColor.Yellow;
+                case Suit.Blue: return usable ? ConsoleColor.Blue : ConsoleColor.DarkBlue;
+                case Suit.Green: return usable ? ConsoleColor.Green : ConsoleColor.DarkGreen;
+                case Suit.Red: return usable ? ConsoleColor.Red : ConsoleColor.DarkRed;
+                case Suit.White: return usable ? ConsoleColor.White : ConsoleColor.DarkGray;
+                case Suit.Yellow: return usable ? ConsoleColor.Yellow : ConsoleColor.DarkYellow;
                 default: throw new InvalidOperationException("Unknown suit");
             }
         }
@@ -198,6 +215,11 @@ namespace LostCities
         {
             this.investments.Add(card);
         }
+
+        public bool CanInvest(Card card)
+        {
+            return card.Value >= (this.investments.LastOrDefault()?.Value ?? 0);
+        }
     }
 
     public class Player
@@ -228,6 +250,11 @@ namespace LostCities
             this.hand.RemoveAt(index);
             this.Adventures[card.Suit].Invest(card);
             return this;
+        }
+
+        public bool CanInvest(Card card)
+        {
+            return this.Adventures[card.Suit].CanInvest(card);
         }
 
         public Player Discard(int index)
