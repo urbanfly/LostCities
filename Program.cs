@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using System.Collections.Generic;
 
@@ -40,51 +40,33 @@ namespace LostCities
             Console.SetCursorPosition(0, player.Number == 1 ? 0 : 36);
 
             {
-                var choices = GetChoices(player.Game.Discards);
+                var choices = GetChoices(player.Game);
                 var choice = ReadOptions($"From where will you draw a card? {choices.prompt}", choices.choices);
-                switch (choice)
-                {
-                    case 'd':
-                        player.DrawFrom(player.Game.Deck);
-                        break;
-                    case 'r':
-                        player.DrawFrom(player.Game.Discards[Suit.Red]);
-                        break;
-                    case 'g':
-                        player.DrawFrom(player.Game.Discards[Suit.Green]);
-                        break;
-                    case 'w':
-                        player.DrawFrom(player.Game.Discards[Suit.White]);
-                        break;
-                    case 'b':
-                        player.DrawFrom(player.Game.Discards[Suit.Blue]);
-                        break;
-                    case 'y':
-                        player.DrawFrom(player.Game.Discards[Suit.Yellow]);
-                        break;
-                }
+                player.DrawFrom(choice);
             }
 
             DrawPlayingArea(player.Game);
             Console.SetCursorPosition(0, player.Number == 1 ? 0 : 36);
 
-            (string prompt, char[] choices) GetChoices(IEnumerable<KeyValuePair<Suit, IList<Card>>> discards)
+            (string prompt, IDictionary<char, IList<Card>> choices) GetChoices(Game game)
             {
-                var piles = discards.Where(d=>player.CanDrawFrom(d.Value)).Select(d=>d.Key.ToString()).Prepend("Deck");
-                var options = piles.Select(p=>p.ToLowerInvariant()[0]).ToArray();
-                var prompt = string.Join(", ", piles.Select(p=>p.Insert(0, "[").Insert(2, "]")));
+                var piles = game.Discards.Where(d=>player.CanDrawFrom(d.Value)).ToDictionary(d=>d.Key.ToString(), d=>d.Value);
+                piles.Add("Deck", game.Deck);
+
+                var options = piles.ToDictionary(p=>p.Key.ToLowerInvariant()[0], p=>p.Value);
+                var prompt = string.Join(", ", piles.Select(p=>p.Key.Insert(0, "[").Insert(2, "]")));
                 return (prompt, options);
             }
         }
 
-        static char ReadOptions(string prompt, params char[] options)
+        static IList<Card> ReadOptions(string prompt, IDictionary<char, IList<Card>> options)
         {
             Console.Write(prompt);
             do
             {
                 var key = Console.ReadKey(true);
-                if (options.Contains(key.KeyChar))
-                    return key.KeyChar;
+                if (options.ContainsKey(key.KeyChar))
+                    return options[key.KeyChar];
             } while(true);
         }
 
