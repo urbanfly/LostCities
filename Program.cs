@@ -184,7 +184,8 @@ namespace LostCities
                 Console.ForegroundColor = ConsoleColor.Black;
                 Console.BackgroundColor = GetConsoleColor(suit);
                 Console.SetCursorPosition(left, top);
-                Console.Write(suit.ToString()[0]);
+                var lastDiscard = game.Discards[suit].LastOrDefault();
+                Console.Write(lastDiscard == null ? suit.ToString()[0].ToString() : GetCardDisplayText(lastDiscard));
 
                 Console.ResetColor();
                 Console.ForegroundColor = GetConsoleColor(suit);
