@@ -91,11 +91,11 @@ namespace LostCities
 
                 if (player.CanInvest(player.Candidate))
                 {
-                    Console.Write("Use the arrow keys to select a card. [I]nvest or [D]iscard or [P]eek at a discard pile");
+                    Console.Write("Use the arrow keys to select a card. [I]nvest or [D]iscard or [P]eek at the discard piles");
                 }
                 else
                 {
-                    Console.Write("Use the arrow keys to select a card. [D]iscard or [P]eek at a discard pile            ");
+                    Console.Write("Use the arrow keys to select a card. [D]iscard or [P]eek at the discard piles            ");
                 }
 
                 Console.SetCursorPosition(6, player.Number == 1 ? 2 : 34);
@@ -205,7 +205,6 @@ namespace LostCities
                     Console.SetCursorPosition(left-1, 4);
                     Console.Write(game.Player1.Adventures[suit].Value);
 
-                    Console.ForegroundColor = GetConsoleColor(suit, lastDiscard != game.CurrentPlayer.LastDiscardedCard);
                     foreach (var c in game.Player1.Adventures[suit].Investments)
                     {
                         Console.SetCursorPosition(left, --top);
@@ -213,11 +212,9 @@ namespace LostCities
                     }
                     top = boardPosition;
 
-                    Console.ForegroundColor = GetConsoleColor(suit);
                     Console.SetCursorPosition(left-1, 32);
                     Console.Write(game.Player2.Adventures[suit].Value);
 
-                    Console.ForegroundColor = GetConsoleColor(suit, lastDiscard != game.CurrentPlayer.LastDiscardedCard);
                     foreach (var c in game.Player2.Adventures[suit].Investments)
                     {
                         Console.SetCursorPosition(left, ++top);
