@@ -5,7 +5,6 @@ using System.Collections.Generic;
 namespace LostCities
 {
     // TODO: allow peeking at a discard pile
-    // TODO: refactor to use Stack<Card> for the deck and the discard piles
 
     class Program
     {
@@ -47,7 +46,7 @@ namespace LostCities
             DrawPlayingArea(player.Game);
             Console.SetCursorPosition(0, player.Number == 1 ? 0 : 36);
 
-            (string prompt, IDictionary<char, IList<Card>> choices) GetChoices(Game game)
+            (string prompt, IDictionary<char, Stack<Card>> choices) GetChoices(Game game)
             {
                 var piles = game.Discards.Where(d=>player.CanDrawFrom(d.Value)).ToDictionary(d=>d.Key.ToString(), d=>d.Value);
                 piles.Add("Deck", game.Deck);
@@ -58,7 +57,7 @@ namespace LostCities
             }
         }
 
-        static IList<Card> ReadOptions(string prompt, IDictionary<char, IList<Card>> options)
+        static Stack<Card> ReadOptions(string prompt, IDictionary<char, Stack<Card>> options)
         {
             Console.Write(prompt);
             do
@@ -349,16 +348,15 @@ namespace LostCities
 
         public Card Candidate {get;set;}
 
-        public void DrawFrom(IList<Card> deck)
+        public void DrawFrom(Stack<Card> deck)
         {
-            var card = deck.Last();
-            deck.Remove(card);
+            var card = deck.Pop();
             this.hand.Add(card);
             this.hand.Sort();
             this.Game.NextPlayer();
         }
 
-        public bool CanDrawFrom(IList<Card> stack)
+        public bool CanDrawFrom(Stack<Card> stack)
         {
             return stack.Any() && (this.LastDiscardedCard == null || this.LastDiscardedCard != stack.LastOrDefault());
         }
@@ -368,21 +366,16 @@ namespace LostCities
     {
         public static IList<Card> GenerateDeck()
         {
-            return (from suit in Enum.GetValues(typeof(Suit)).OfType<Suit>()
-                    from v in Enumerable.Range(-1, 12)
-                    select new Card(v, suit)).ToList();
+            return new List<Card>(from suit in Enum.GetValues(typeof(Suit)).OfType<Suit>()
+                                  from v in Enumerable.Range(-1, 12)
+                                  select new Card(v, suit));
         }
 
         public Game()
         {
-            this.Deck = GenerateDeck().Shuffle();
-            this.Discards = Enum.GetValues(typeof(Suit)).OfType<Suit>().ToDictionary(s=>s, s => (IList<Card>)new List<Card>());
-            var hands = Deal(8, 2);
-            this.Players = new[]
-            {
-                new Player(this, 1, hands[0].ToList()), 
-                new Player(this, 2, hands[1].ToList())
-            };
+            this.Deck = new Stack<Card>(GenerateDeck().Shuffle());
+            this.Discards = Enum.GetValues(typeof(Suit)).OfType<Suit>().ToDictionary(s=>s, s => (Stack<Card>)new Stack<Card>());
+            this.Players = Deal(8, 2).Select((hand, index) => new Player(this, index+1, hand.ToList())).ToArray();
 
             Card[][] Deal(int numberOfCards, int numberOfPlayers)
             {
@@ -394,8 +387,7 @@ namespace LostCities
                 {
                     for (var p = 0; p < numberOfPlayers; p++)
                     {
-                        var card = this.Deck[0];
-                        this.Deck.RemoveAt(0);
+                        var card = this.Deck.Pop();
                         result[p][i] = card;
                     }
                 }
@@ -404,8 +396,8 @@ namespace LostCities
             }
         }
 
-        public IList<Card> Deck {get;}
-        public IReadOnlyDictionary<Suit, IList<Card>> Discards {get;}
+        public Stack<Card> Deck {get;}
+        public IReadOnlyDictionary<Suit, Stack<Card>> Discards {get;}
         public Player Player1 => this.Players[0];
         public Player Player2 => this.Players[1];
 
@@ -416,7 +408,7 @@ namespace LostCities
 
         public void Discard(Card card)
         {
-            this.Discards[card.Suit].Add(card);
+            this.Discards[card.Suit].Push(card);
         }
 
         public void NextPlayer()
