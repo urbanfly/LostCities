@@ -4,8 +4,6 @@ using System.Collections.Generic;
 
 namespace LostCities
 {
-    // TODO: allow peeking at a discard pile
-
     class Program
     {
         static void Main(string[] args)
@@ -39,7 +37,7 @@ namespace LostCities
 
             {
                 var choices = GetChoices(player.Game);
-                var choice = ReadOptions($"From where will you draw a card? {choices.prompt}", choices.choices);
+                var choice = ReadOptions(player.Game, $"From where will you draw a card? (you can [P]eek at the discard piles) {choices.prompt}", choices.choices);
                 player.DrawFrom(choice);
             }
 
@@ -57,20 +55,34 @@ namespace LostCities
             }
         }
 
-        static Stack<Card> ReadOptions(string prompt, IDictionary<char, Stack<Card>> options)
+        static Stack<Card> ReadOptions(Game game, string prompt, IDictionary<char, Stack<Card>> options)
         {
-            Console.Write(prompt);
+            var showingDiscards = false;
+            var (top, left) = (Console.CursorTop, Console.CursorLeft);
             do
             {
+                Console.Write(prompt);
                 var key = Console.ReadKey(true);
                 if (options.ContainsKey(key.KeyChar))
                     return options[key.KeyChar];
+                if (key.Key == ConsoleKey.P)
+                {
+                    showingDiscards = !showingDiscards;
+                    DrawPlayingArea(game, showingDiscards);
+                }
+                else if (key.Key == ConsoleKey.Escape && showingDiscards)
+                {
+                    showingDiscards = false;
+                    DrawPlayingArea(game, showingDiscards);
+                }
+                Console.SetCursorPosition(left, top);
             } while(true);
         }
 
         static void PickCard(Player player)
         {
             var candidateIndex = 0;
+            var showingDiscards = false;
             do
             {
                 player.Candidate = player.Hand[candidateIndex];
@@ -79,11 +91,11 @@ namespace LostCities
 
                 if (player.CanInvest(player.Candidate))
                 {
-                    Console.Write("Use the arrow keys to select a card. [I]nvest or [D]iscard"); // or [P]eek at a discard pile");
+                    Console.Write("Use the arrow keys to select a card. [I]nvest or [D]iscard or [P]eek at a discard pile");
                 }
                 else
                 {
-                    Console.Write("Use the arrow keys to select a card. [D]iscard            "); // or [P]eek at a discard pile            ");
+                    Console.Write("Use the arrow keys to select a card. [D]iscard or [P]eek at a discard pile            ");
                 }
 
                 Console.SetCursorPosition(6, player.Number == 1 ? 2 : 34);
@@ -108,8 +120,17 @@ namespace LostCities
                     case ConsoleKey.D:
                         player.Discard(player.Candidate);
                         return;
-                    // case ConsoleKey.P:
-                    //     return player.Candidate;
+                    case ConsoleKey.P:
+                        showingDiscards = !showingDiscards;
+                        DrawPlayingArea(player.Game, showingDiscards);
+                        break;
+                    case ConsoleKey.Escape:
+                        if (showingDiscards)
+                        {
+                            showingDiscards = false;
+                            DrawPlayingArea(player.Game, showingDiscards);
+                        }
+                        break;
                 }
             } while(true);
         }
@@ -142,7 +163,7 @@ namespace LostCities
             }
         }
 
-        static void DrawPlayingArea(Game game)
+        static void DrawPlayingArea(Game game, bool showingDiscards = false)
         {
             Console.Clear();
             Console.SetCursorPosition(0,1);
@@ -162,31 +183,46 @@ namespace LostCities
             {
                 Console.ResetColor();
                 Console.ForegroundColor = ConsoleColor.Black;
-                Console.BackgroundColor = GetConsoleColor(suit);
+                Console.BackgroundColor = GetConsoleColor(suit, game.CurrentPlayer.CanDrawFrom(game.Discards[suit]));
                 Console.SetCursorPosition(left, top);
-                var lastDiscard = game.Discards[suit].LastOrDefault();
+                game.Discards[suit].TryPeek(out var lastDiscard);
                 Console.Write(lastDiscard == null ? suit.ToString()[0].ToString() : GetCardDisplayText(lastDiscard));
 
                 Console.ResetColor();
-                Console.ForegroundColor = GetConsoleColor(suit);
 
-                Console.SetCursorPosition(left-1, 4);
-                Console.Write(game.Player1.Adventures[suit].Value);
-
-                foreach (var c in game.Player1.Adventures[suit].Investments)
+                if (showingDiscards)
                 {
-                    Console.SetCursorPosition(left, --top);
-                    Console.Write(GetCardDisplayText(c));
+                    Console.ForegroundColor = GetConsoleColor(suit, lastDiscard != game.CurrentPlayer.LastDiscardedCard);
+                    foreach (var c in game.Discards[suit].Skip(1))
+                    {
+                        Console.SetCursorPosition(left, ++top);
+                        Console.Write(GetCardDisplayText(c));
+                    }
                 }
-                top = boardPosition;
-
-                Console.SetCursorPosition(left-1, 32);
-                Console.Write(game.Player2.Adventures[suit].Value);
-
-                foreach (var c in game.Player2.Adventures[suit].Investments)
+                else
                 {
-                    Console.SetCursorPosition(left, ++top);
-                    Console.Write(GetCardDisplayText(c));
+                    Console.ForegroundColor = GetConsoleColor(suit);
+                    Console.SetCursorPosition(left-1, 4);
+                    Console.Write(game.Player1.Adventures[suit].Value);
+
+                    Console.ForegroundColor = GetConsoleColor(suit, lastDiscard != game.CurrentPlayer.LastDiscardedCard);
+                    foreach (var c in game.Player1.Adventures[suit].Investments)
+                    {
+                        Console.SetCursorPosition(left, --top);
+                        Console.Write(GetCardDisplayText(c));
+                    }
+                    top = boardPosition;
+
+                    Console.ForegroundColor = GetConsoleColor(suit);
+                    Console.SetCursorPosition(left-1, 32);
+                    Console.Write(game.Player2.Adventures[suit].Value);
+
+                    Console.ForegroundColor = GetConsoleColor(suit, lastDiscard != game.CurrentPlayer.LastDiscardedCard);
+                    foreach (var c in game.Player2.Adventures[suit].Investments)
+                    {
+                        Console.SetCursorPosition(left, ++top);
+                        Console.Write(GetCardDisplayText(c));
+                    }
                 }
                 top = boardPosition;
                 left += 4;
@@ -325,7 +361,6 @@ namespace LostCities
         {
             this.hand.Remove(card);
             this.Adventures[card.Suit].Invest(card);
-            this.LastDiscardedCard = null;
             this.Candidate = null;
             return this;
         }
@@ -354,11 +389,12 @@ namespace LostCities
             this.hand.Add(card);
             this.hand.Sort();
             this.Game.NextPlayer();
+            this.LastDiscardedCard = null;
         }
 
         public bool CanDrawFrom(Stack<Card> stack)
         {
-            return stack.Any() && (this.LastDiscardedCard == null || this.LastDiscardedCard != stack.LastOrDefault());
+            return stack.Any() && (this.LastDiscardedCard == null || this.LastDiscardedCard != stack.Peek());
         }
     }
 
@@ -402,7 +438,7 @@ namespace LostCities
         public Player Player2 => this.Players[1];
 
         public int CurrentPlayerIndex {get; set;} = 0;
-        public Player CurrentPlayer => this.Players[CurrentPlayerIndex - 1];
+        public Player CurrentPlayer => this.Players[CurrentPlayerIndex];
 
         public Player[] Players {get;}
 
