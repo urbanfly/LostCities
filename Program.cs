@@ -168,12 +168,10 @@ namespace LostCities
             Console.Clear();
             Console.SetCursorPosition(0,1);
             Console.WriteLine($"Player {game.Player1.Number} Score: {game.Player1.Score}");
-            Console.Write($"Hand: ");
-            DrawHand(game.Player1);
+            if (game.CurrentPlayer == game.Player1) DrawHand(game.Player1);
 
             Console.SetCursorPosition(0,34);
-            Console.Write($"Hand: ");
-            DrawHand(game.Player2);
+            if (game.CurrentPlayer == game.Player2) DrawHand(game.Player2);
             Console.WriteLine($"Player {game.Player2.Number} Score: {game.Player2.Score}");
 
             var boardPosition = 18;
@@ -237,6 +235,7 @@ namespace LostCities
 
         static void DrawHand(Player player)
         {
+            Console.Write($"Hand: ");
             foreach (var card in player.Hand)
             {
                 if (card == player.Candidate)
