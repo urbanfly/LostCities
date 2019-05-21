@@ -37,7 +37,7 @@ namespace LostCities
 
             {
                 var choices = GetChoices(player.Game);
-                var choice = ReadOptions(player.Game, $"From where will you draw a card? (you can [P]eek at the discard piles) {choices.prompt}", choices.choices);
+                var choice = ReadOptions(player.Game, $"From where will you draw a card? {choices.prompt}", choices.choices);
                 player.DrawFrom(choice);
             }
 
@@ -57,32 +57,18 @@ namespace LostCities
 
         static Stack<Card> ReadOptions(Game game, string prompt, IDictionary<char, Stack<Card>> options)
         {
-            var showingDiscards = false;
-            var (top, left) = (Console.CursorTop, Console.CursorLeft);
+            Console.Write(prompt);
             do
             {
-                Console.Write(prompt);
                 var key = Console.ReadKey(true);
                 if (options.ContainsKey(key.KeyChar))
                     return options[key.KeyChar];
-                if (key.Key == ConsoleKey.P)
-                {
-                    showingDiscards = !showingDiscards;
-                    DrawPlayingArea(game, showingDiscards);
-                }
-                else if (key.Key == ConsoleKey.Escape && showingDiscards)
-                {
-                    showingDiscards = false;
-                    DrawPlayingArea(game, showingDiscards);
-                }
-                Console.SetCursorPosition(left, top);
             } while(true);
         }
 
         static void PickCard(Player player)
         {
             var candidateIndex = 0;
-            var showingDiscards = false;
             do
             {
                 player.Candidate = player.Hand[candidateIndex];
@@ -91,11 +77,11 @@ namespace LostCities
 
                 if (player.CanInvest(player.Candidate))
                 {
-                    Console.Write("Use the arrow keys to select a card. [I]nvest or [D]iscard or [P]eek at the discard piles");
+                    Console.Write("Use the arrow keys to select a card. [I]nvest or [D]iscard");
                 }
                 else
                 {
-                    Console.Write("Use the arrow keys to select a card. [D]iscard or [P]eek at the discard piles            ");
+                    Console.Write("Use the arrow keys to select a card. [D]iscard            ");
                 }
 
                 Console.SetCursorPosition(6, player.Number == 1 ? 2 : 34);
@@ -120,17 +106,6 @@ namespace LostCities
                     case ConsoleKey.D:
                         player.Discard(player.Candidate);
                         return;
-                    case ConsoleKey.P:
-                        showingDiscards = !showingDiscards;
-                        DrawPlayingArea(player.Game, showingDiscards);
-                        break;
-                    case ConsoleKey.Escape:
-                        if (showingDiscards)
-                        {
-                            showingDiscards = false;
-                            DrawPlayingArea(player.Game, showingDiscards);
-                        }
-                        break;
                 }
             } while(true);
         }
@@ -163,7 +138,7 @@ namespace LostCities
             }
         }
 
-        static void DrawPlayingArea(Game game, bool showingDiscards = false)
+        static void DrawPlayingArea(Game game)
         {
             Console.Clear();
             Console.SetCursorPosition(0,1);
@@ -183,41 +158,31 @@ namespace LostCities
                 Console.ForegroundColor = ConsoleColor.Black;
                 Console.BackgroundColor = GetConsoleColor(suit, game.CurrentPlayer.CanDrawFrom(game.Discards[suit]));
                 Console.SetCursorPosition(left, top);
-                game.Discards[suit].TryPeek(out var lastDiscard);
-                Console.Write(lastDiscard == null ? suit.ToString()[0].ToString() : GetCardDisplayText(lastDiscard));
+                if (game.Discards[suit].TryPeek(out var lastDiscard))
+                    Console.Write(GetCardDisplayText(lastDiscard));
+                else
+                    Console.Write(suit.ToString()[0].ToString());
 
                 Console.ResetColor();
 
-                if (showingDiscards)
+                Console.ForegroundColor = GetConsoleColor(suit);
+                Console.SetCursorPosition(left-1, 4);
+                Console.Write(game.Player1.Adventures[suit].Value);
+
+                foreach (var c in game.Player1.Adventures[suit].Investments)
                 {
-                    Console.ForegroundColor = GetConsoleColor(suit, lastDiscard != game.CurrentPlayer.LastDiscardedCard);
-                    foreach (var c in game.Discards[suit].Skip(1))
-                    {
-                        Console.SetCursorPosition(left, ++top);
-                        Console.Write(GetCardDisplayText(c));
-                    }
+                    Console.SetCursorPosition(left, --top);
+                    Console.Write(GetCardDisplayText(c));
                 }
-                else
+                top = boardPosition;
+
+                Console.SetCursorPosition(left-1, 32);
+                Console.Write(game.Player2.Adventures[suit].Value);
+
+                foreach (var c in game.Player2.Adventures[suit].Investments)
                 {
-                    Console.ForegroundColor = GetConsoleColor(suit);
-                    Console.SetCursorPosition(left-1, 4);
-                    Console.Write(game.Player1.Adventures[suit].Value);
-
-                    foreach (var c in game.Player1.Adventures[suit].Investments)
-                    {
-                        Console.SetCursorPosition(left, --top);
-                        Console.Write(GetCardDisplayText(c));
-                    }
-                    top = boardPosition;
-
-                    Console.SetCursorPosition(left-1, 32);
-                    Console.Write(game.Player2.Adventures[suit].Value);
-
-                    foreach (var c in game.Player2.Adventures[suit].Investments)
-                    {
-                        Console.SetCursorPosition(left, ++top);
-                        Console.Write(GetCardDisplayText(c));
-                    }
+                    Console.SetCursorPosition(left, ++top);
+                    Console.Write(GetCardDisplayText(c));
                 }
                 top = boardPosition;
                 left += 4;
@@ -390,7 +355,7 @@ namespace LostCities
 
         public bool CanDrawFrom(Stack<Card> stack)
         {
-            return stack.Any() && (this.LastDiscardedCard == null || this.LastDiscardedCard != stack.Peek());
+            return stack.TryPeek(out var topCard) && (this.LastDiscardedCard == null || this.LastDiscardedCard != topCard);
         }
     }
 
